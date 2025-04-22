@@ -7,6 +7,7 @@ use App\Notifications\ServersSuspendedNotification;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ChargeServers extends Command
 {
@@ -30,6 +31,8 @@ class ChargeServers extends Command
      */
     protected $usersToNotify = [];
 
+    protected $usersWithInsufficientCredits = [];
+
     /**
      * Create a new command instance.
      *
@@ -50,53 +53,44 @@ class ChargeServers extends Command
         Server::whereNull('suspended')->with('user', 'product')->chunk(10, function ($servers) {
             /** @var Server $server */
             foreach ($servers as $server) {
+                if (!$server->needsRenewal()) {
+                    continue;
+                }
+
                 /** @var Product $product */
                 $product = $server->product;
                 /** @var User $user */
                 $user = $server->user;
 
-                $billing_period = $product->billing_period;
+                // Calculate total cost of all servers that need renewal for this user
+                $userServers = $user->servers()->whereNull('suspended')->get();
+                $serversNeedingRenewal = $userServers->filter(fn($s) => $s->needsRenewal());
+                $totalRenewalCost = $serversNeedingRenewal->sum(fn($s) => $s->product->price);
 
-                // check if server is due to be charged by comparing its last_billed date with the current date and the billing period
-                $newBillingDate = null;
-                switch ($billing_period) {
-                    case 'annually':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addYear();
-                        break;
-                    case 'half-annually':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addMonths(6);
-                        break;
-                    case 'quarterly':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addMonths(3);
-                        break;
-                    case 'monthly':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addMonth();
-                        break;
-                    case 'weekly':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addWeek();
-                        break;
-                    case 'daily':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addDay();
-                        break;
-                    case 'hourly':
-                        $newBillingDate = Carbon::parse($server->last_billed)->addHour();
-                    default:
-                        $newBillingDate = Carbon::parse($server->last_billed)->addHour();
-                        break;
-                };
-
-                if (!($newBillingDate->isPast())) {
+                // If user doesn't have enough credits for all renewals
+                if ($user->credits < $totalRenewalCost && $serversNeedingRenewal->count() > 1) {
+                    if (!isset($this->usersWithInsufficientCredits[$user->id])) {
+                        $this->usersWithInsufficientCredits[$user->id] = [
+                            'user' => $user,
+                            'servers' => collect(),
+                            'total_cost' => $totalRenewalCost
+                        ];
+                    }
+                    $this->usersWithInsufficientCredits[$user->id]['servers']->push([
+                        'id' => $server->id,
+                        'name' => $server->name,
+                        'price' => $product->price,
+                        'next_billing' => $server->getNextBillingDate()
+                    ]);
                     continue;
                 }
 
-                // check if the server is canceled or if user has enough credits to charge the server
+                // Normal renewal process for users with sufficient credits
                 if ($server->canceled || ($user->credits < $product->price && $product->price != 0)) {
                     try {
-                        // suspend server
                         $this->line("<fg=yellow>{$server->name}</> from user: <fg=blue>{$user->name}</> has been <fg=red>suspended!</>");
                         $server->suspend();
 
-                        // add user to notify list
                         if (!in_array($user, $this->usersToNotify)) {
                             array_push($this->usersToNotify, $user);
                         }
@@ -104,13 +98,28 @@ class ChargeServers extends Command
                         $this->error($exception->getMessage());
                     }
                 } else {
-                    // charge credits to user
                     $this->line("<fg=blue>{$user->name}</> Current credits: <fg=green>{$user->credits}</> Credits to be removed: <fg=red>{$product->price}</>");
                     $user->decrement('credits', $product->price);
-
-                    // update server last_billed date in db
-                    DB::table('servers')->where('id', $server->id)->update(['last_billed' => $newBillingDate]);
+                    DB::table('servers')->where('id', $server->id)->update(['last_billed' => $server->getNextBillingDate()]);
                 }
+            }
+
+            // Notify users who need to select servers for renewal
+            foreach ($this->usersWithInsufficientCredits as $userData) {
+                Cache::put(
+                    "user.{$userData['user']->id}.pending_renewals",
+                    [
+                        'servers' => $userData['servers'],
+                        'total_cost' => $userData['total_cost'],
+                        'available_credits' => $userData['user']->credits
+                    ],
+                    now()->addDay()
+                );
+
+                $userData['user']->notifyInsufficientCredits(
+                    $userData['servers'],
+                    $userData['total_cost']
+                );
             }
 
             return $this->notifyUsers();

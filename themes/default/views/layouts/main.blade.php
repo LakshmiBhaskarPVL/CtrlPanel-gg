@@ -221,6 +221,18 @@
                         @endcanany
                       @endif
 
+                      @if(Cache::has("user." . Auth::user()->id . ".pending_renewals"))
+                        <li class="nav-item">
+                            <a href="{{ route('servers.pending-renewals') }}" class="nav-link {{ request()->routeIs('servers.pending-renewals') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-sync"></i>
+                                <p>
+                                    {{__('Pending Renewals')}}
+                                    <span class="right badge badge-warning">!</span>
+                                </p>
+                            </a>
+                        </li>
+                      @endif
+
                       @canany(array_merge(
                           PermissionGroups::TICKET_PERMISSIONS,
                           PermissionGroups::OVERVIEW_PERMISSIONS,

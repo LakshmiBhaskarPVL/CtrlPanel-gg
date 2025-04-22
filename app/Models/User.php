@@ -332,4 +332,9 @@ class User extends Authenticatable implements MustVerifyEmail
             ->dontSubmitEmptyLogs()
             ->dontLogIfAttributesChangedOnly(['credits', 'server_limit']);
     }
+
+    public function notifyInsufficientCredits($servers, $totalCost)
+    {
+        $this->notify(new InsufficientCreditsNotification($servers, $totalCost));
+    }
 }

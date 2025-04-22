@@ -165,4 +165,32 @@ class Server extends Model
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
+    public function needsRenewal()
+    {
+        return $this->getNextBillingDate()->isPast();
+    }
+
+    public function getNextBillingDate()
+    {
+        $billing_period = $this->product->billing_period;
+        
+        switch ($billing_period) {
+            case 'annually':
+                return Carbon::parse($this->last_billed)->addYear();
+            case 'half-annually':
+                return Carbon::parse($this->last_billed)->addMonths(6);
+            case 'quarterly':
+                return Carbon::parse($this->last_billed)->addMonths(3);
+            case 'monthly':
+                return Carbon::parse($this->last_billed)->addMonth();
+            case 'weekly':
+                return Carbon::parse($this->last_billed)->addWeek();
+            case 'daily':
+                return Carbon::parse($this->last_billed)->addDay();
+            case 'hourly':
+            default:
+                return Carbon::parse($this->last_billed)->addHour();
+        }
+    }
+
 }

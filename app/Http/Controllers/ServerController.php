@@ -598,4 +598,98 @@ class ServerController extends Controller
             'variables' => $variables,
         ]);
     }
+
+    public function getPendingRenewals()
+    {
+        $user = Auth::user();
+        $pendingRenewals = Cache::get("user.{$user->id}.pending_renewals");
+        
+        if (!$pendingRenewals) {
+            return response()->json([
+                'message' => 'No pending renewals found',
+                'data' => null
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Pending renewals retrieved successfully',
+            'data' => $pendingRenewals
+        ]);
+    }
+
+    public function renewSelected(Request $request)
+    {
+        $user = Auth::user();
+        $pendingRenewals = Cache::get("user.{$user->id}.pending_renewals");
+        
+        if (!$pendingRenewals) {
+            return response()->json([
+                'message' => 'No pending renewals found'
+            ], 404);
+        }
+
+        $serverIds = $request->validate([
+            'server_ids' => 'required|array',
+            'server_ids.*' => 'exists:servers,id'
+        ]);
+
+        $selectedServers = collect($pendingRenewals['servers'])
+            ->whereIn('id', $serverIds['server_ids']);
+            
+        $totalCost = $selectedServers->sum('price');
+
+        if ($user->credits < $totalCost) {
+            return response()->json([
+                'message' => 'Insufficient credits for selected servers'
+            ], 400);
+        }
+
+        // Process renewals
+        foreach ($selectedServers as $serverData) {
+            $server = Server::find($serverData['id']);
+            if ($server && $server->user_id === $user->id) {
+                $user->decrement('credits', $server->product->price);
+                $server->update(['last_billed' => $server->getNextBillingDate()]);
+            }
+        }
+
+        // Remove or update the cache entry
+        $remainingServers = collect($pendingRenewals['servers'])
+            ->whereNotIn('id', $serverIds['server_ids']);
+
+        if ($remainingServers->isEmpty()) {
+            Cache::forget("user.{$user->id}.pending_renewals");
+        } else {
+            Cache::put(
+                "user.{$user->id}.pending_renewals",
+                [
+                    'servers' => $remainingServers,
+                    'total_cost' => $remainingServers->sum('price'),
+                    'available_credits' => $user->credits
+                ],
+                now()->addDay()
+            );
+        }
+
+        return response()->json([
+            'message' => 'Servers renewed successfully',
+            'remaining_credits' => $user->credits
+        ]);
+    }
+
+    public function showPendingRenewals()
+    {
+        $user = Auth::user();
+        $pendingRenewals = Cache::get("user.{$user->id}.pending_renewals");
+        
+        if (!$pendingRenewals) {
+            return redirect()->route('servers.index')
+                ->with('info', __('No servers pending renewal'));
+        }
+
+        return view('servers.pending-renewals', [
+            'servers' => $pendingRenewals['servers'],
+            'available_credits' => $pendingRenewals['available_credits']
+        ]);
+    }
 }

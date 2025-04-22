@@ -117,6 +117,13 @@ Route::middleware(['auth', 'checkSuspended'])->group(function () {
 
     Route::post('ticket/status/{ticket_id}', [TicketsController::class, 'changeStatus'])->name('ticket.changeStatus');
 
+    // Server Renewal Routes
+    Route::get('/servers/pending-renewals', [ServerController::class, 'showPendingRenewals'])->name('servers.pending-renewals');
+    Route::get('/servers/pending-renewals/data', [ServerController::class, 'getPendingRenewals'])->name('servers.pending-renewals.data');
+    Route::post('/servers/renew-selected', [ServerController::class, 'renewSelected'])->name('servers.renew-selected');
+
+    Route::get('/servers/pending-renewals', [ServerController::class, 'getPendingRenewals'])->name('servers.pending-renewals');
+    Route::post('/servers/renew-selected', [ServerController::class, 'renewSelected'])->name('servers.renew-selected');
 
     //admin
     Route::prefix('admin')->name('admin.')->group(function () {
