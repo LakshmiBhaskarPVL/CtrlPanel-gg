@@ -4,7 +4,7 @@
     <!-- CONTENT HEADER -->
     <section class="content-header">
         <div class="container-fluid">
-            <div class="row mb-2">
+            <div class="mb-2 row">
                 <div class="col-sm-6">
                     <h1>{{ __('Products') }}</h1>
                 </div>
@@ -36,7 +36,7 @@
                             </div>
                             <div class="card-body">
 
-                                <div class="d-flex flex-row-reverse">
+                                <div class="flex-row-reverse d-flex">
                                     <div class="custom-control custom-switch">
                                         <input type="checkbox" name="disabled"
                                             class="custom-control-input custom-control-input-danger" id="switch1">
@@ -64,7 +64,7 @@
 
                                         <div class="form-group">
                                             <label for="price">{{ __('Price in') }} {{ $credits_display_name }}</label>
-                                            <input value="{{ $product->price ?? old('price') }}" id="price"
+                                            <input value="{{ old('price') }}" id="price"
                                                 name="price" step=".0001" type="number"
                                                 class="form-control @error('price') is-invalid @enderror"
                                                 required="required">
@@ -170,48 +170,47 @@
                                                     data-content="{{ __('Period when the user will be charged for the given price') }}"
                                                     class="fas fa-info-circle"></i></label>
 
-                                            <select id="billing_period" style="width:100%" class="custom-select"
-                                                name="billing_period" required autocomplete="off"
-                                                @error('billing_period') is-invalid @enderror>
-                                                <option value="hourly" selected>
-                                                    {{ __('Hourly') }}
-                                                </option>
-                                                <option value="daily">
-                                                    {{ __('Daily') }}
-                                                </option>
-                                                <option value="weekly">
-                                                    {{ __('Weekly') }}
-                                                </option>
-                                                <option value="monthly">
-                                                    {{ __('Monthly') }}
-                                                </option>
-                                                <option value="quarterly">
-                                                    {{ __('Quarterly') }}
-                                                </option>
-                                                <option value="half-annually">
-                                                    {{ __('Half Annually') }}
-                                                </option>
-                                                <option value="annually">
-                                                    {{ __('Annually') }}
-                                                </option>
-                                            </select>
+                                    <select id="billing_period" style="width:100%" class="custom-select"
+                                            name="billing_period" required autocomplete="off"
+                                            @error('billing_period') is-invalid @enderror>
+                                        <option value="hourly" {{ old('billing_period', $product->billing_period ?? '') == 'hourly' ? 'selected' : '' }}>
+                                            {{ __('Hourly') }}
+                                        </option>
+                                        <option value="daily" {{ old('billing_period', $product->billing_period ?? '') == 'daily' ? 'selected' : '' }}>
+                                            {{ __('Daily') }}
+                                        </option>
+                                        <option value="weekly" {{ old('billing_period', $product->billing_period ?? '') == 'weekly' ? 'selected' : '' }}>
+                                            {{ __('Weekly') }}
+                                        </option>
+                                        <option value="monthly" {{ old('billing_period', $product->billing_period ?? '') == 'monthly' ? 'selected' : '' }}>
+                                            {{ __('Monthly') }}
+                                        </option>
+                                        <option value="quarterly" {{ old('billing_period', $product->billing_period ?? '') == 'quarterly' ? 'selected' : '' }}>
+                                            {{ __('Quarterly') }}
+                                        </option>
+                                        <option value="half-annually" {{ old('billing_period', $product->billing_period ?? '') == 'half-annually' ? 'selected' : '' }}>
+                                            {{ __('Half Annually') }}
+                                        </option>
+                                        <option value="annually" {{ old('billing_period', $product->billing_period ?? '') == 'annually' ? 'selected' : '' }}>
+                                            {{ __('Annually') }}
+                                        </option>
+                                    </select>
+
                                             @error('billing_period')
                                                 <div class="invalid-feedback">
                                                     {{ $message }}
                                                 </div>
                                             @enderror
                                         </div>
-
                                         <div class="form-group">
                                             <label for="minimum_credits">{{ __('Minimum') }} {{ $credits_display_name }}
                                                 <i data-toggle="popover" data-trigger="hover"
-                                                    data-content="{{ __('Setting to -1 will use the value from configuration.') }}"
+                                                    data-content="{{ __('Setting to empty will use the value from configuration.') }}"
                                                     class="fas fa-info-circle"></i></label>
                                             <input
-                                                value="{{ $product->minimum_credits ?? (old('minimum_credits') ?? -1) }}"
+                                                value="{{ (old('minimum_credits') ?? null) }}"
                                                 id="minimum_credits" name="minimum_credits" type="number"
-                                                class="form-control @error('minimum_credits') is-invalid @enderror"
-                                                required="required">
+                                                class="form-control @error('minimum_credits') is-invalid @enderror">
                                             @error('minimum_credits')
                                                 <div class="invalid-feedback">
                                                     {{ $message }}
@@ -273,7 +272,7 @@
                                     </div>
                                 </div>
 
-                                <div class="form-group text-right">
+                                <div class="text-right form-group">
                                     <button type="submit" class="btn btn-primary">
                                         {{ __('Submit') }}
                                     </button>
@@ -322,11 +321,11 @@
 
 
                                 <div class="form-group">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="mb-2 d-flex justify-content-between align-items-center">
                                         <label for="eggs" class="mb-0">{{ __('Eggs') }}</label>
                                         <div>
                                             <button type="button" id="select-all-eggs" class="btn btn-sm btn-secondary">{{ __('Select All') }}</button>
-                                            <button type="button" id="deselect-all-eggs" class="btn btn-sm btn-secondary ml-2">{{ __('Deselect All') }}</button>
+                                            <button type="button" id="deselect-all-eggs" class="ml-2 btn btn-sm btn-secondary">{{ __('Deselect All') }}</button>
                                         </div>
                                     </div>
                                     <select id="eggs" style="width:100%"

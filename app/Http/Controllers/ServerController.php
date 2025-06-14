@@ -176,9 +176,7 @@ class ServerController extends Controller
             return __('You can not create any more Servers with this product!');
         }
 
-        $minCredits = $product->minimum_credits == -1
-            ? $this->userSettings->min_credits_to_make_server
-            : $product->minimum_credits;
+        $minCredits = $product->minimum_credits ?: $this->userSettings->min_credits_to_make_server;
 
         if ($user->credits < $minCredits) {
             return 'You do not have the required amount of ' . $this->generalSettings->credits_display_name . ' to use this product!';
@@ -300,16 +298,18 @@ class ServerController extends Controller
 
     private function handlePostCreation(User $user, Server $server): void
     {
+        logger('Product Price: ' . $server->product->price);
+
         $user->decrement('credits', $server->product->price);
 
         try {
-            if ($this->discordSettings->role_on_purchase &&
+            if ($this->discordSettings->role_for_active_clients &&
                 $user->discordUser &&
                 $user->servers->count() >= 1
             ) {
                 $user->discordUser->addOrRemoveRole(
                     'add',
-                    $this->discordSettings->role_id_on_purchase
+                    $this->discordSettings->role_id_for_active_clients
                 );
             }
         } catch (Exception $e) {
@@ -348,12 +348,12 @@ class ServerController extends Controller
 
     private function handleServerDeletion(Server $server): void
     {
-        if ($this->discordSettings->role_on_purchase) {
+        if ($this->discordSettings->role_for_active_clients) {
             $user = User::findOrFail($server->user_id);
             if ($user->discordUser && $user->servers->count() <= 1) {
                 $user->discordUser->addOrRemoveRole(
                     'remove',
-                    $this->discordSettings->role_id_on_purchase
+                    $this->discordSettings->role_id_for_active_clients
                 );
             }
         }
